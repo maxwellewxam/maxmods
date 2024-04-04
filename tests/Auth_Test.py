@@ -16,7 +16,6 @@ with sixauth.SingleUser(sixauth.Configure()
 with sixauth.SingleUser(sixauth.Configure()
                           .database(path = f'{os.getcwd()}/db.db')
                           .authenticator(max_age = 3600)) as user2:
-    print(user.authenticator.logout(user.user.UUID, user.user.TOKEN, user.id))
     print(user2.login('max', 'max2'))
     print(user2.find('bruh').decode('utf-8'))
     print(user2.remove_user('max2'))

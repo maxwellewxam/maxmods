@@ -54,16 +54,7 @@ class MultiUser:
     def update_password(self, user: User, password: str, new_password: str):
         if user.BAD_USER:
             return BAD_USER
-        keys = self.authenticator.update_password(user.UUID, password, new_password)
-        if keys in (BAD_USER, BAD_PASS):
-            return keys
-        old_key, new_key = keys
-        for row in self.db.multi_find(user.TABLE):
-            key, data = row
-            unencrypted = Fernet(old_key).decrypt(data)
-            reencrypted = Fernet(new_key).encrypt(unencrypted)
-            self.db.update(user.TABLE, 'key', key, value=reencrypted)
-        return SUCCESS
+        return self.authenticator.update_password(user.UUID, password, new_password)
     
     # make the remove_user function available to the user and some other processing 
     def remove_user(self, user: User, password: str):
