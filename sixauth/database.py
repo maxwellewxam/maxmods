@@ -17,7 +17,7 @@ class Database:
         self.metadata = MetaData() # metadata for the database
         self.connection = self.engine.connect() # connect to the database
     
-    def get_conf(self, path = f'{os.getcwd()}/db.db'):
+    def get_conf(self, path = os.path.join(os.getcwd(),'db.db')):
         self.path = path
     
     # we need this to save everything to the database when we are done

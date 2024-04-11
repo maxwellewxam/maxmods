@@ -71,7 +71,7 @@ class Authenticator:
                                        datetime.now(pytz.utc) + timedelta(seconds=self.max_age), # when the token expires
                                        hwid, # the hwid of the session
                                        encrypted_key]) # and the key the user needs for their data
-        return (from_db[0], token) # then lastly we return the token and uuid
+        return from_db[0], token # then lastly we return the token and uuid
     
     # just search store sessions for token
     def find_token(self, from_store, token):
