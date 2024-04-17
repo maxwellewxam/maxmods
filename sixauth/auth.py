@@ -34,14 +34,15 @@ class Authenticator:
         self.table = self.db.table('users', table)
         self.store: dict[uuid.UUID, list[list]] = {} # create a dict for tokens
     
-    def get_conf(self, db:Database = Database(), max_age = 3600):
+    def get_conf(self, db:Database = Database(), max_age = 3600, exceptions = True):
         self.db = db
         self.max_age = max_age 
+        self.exceptions = exceptions
     
     # we need users to authenticate!
     def new_user(self, username: str, password: str):
         if self.db.find(self.table, 'username', username): # ok first we check if the user exists
-            return BAD_USER # if they do, we return BAD_USER
+            return ((_ for _ in []).throw(AuthenticationError(BAD_USER)) if self.exceptions else BAD_USER) # if they do, we return BAD_USER
         salt = bcrypt.gensalt() # create a salt
         esalt = bcrypt.gensalt() # create a esalt
         hash = bcrypt.hashpw(password.encode(), salt) # hash the password
@@ -56,9 +57,9 @@ class Authenticator:
     def login(self, username: str, password: str, hwid: str):
         from_db = self.db.find(self.table, 'username', username) # first we grab the db entry for the user
         if not from_db: # then we check if the user exists
-            return BAD_USER # if they dont, we return BAD_USER
+            return ((_ for _ in []).throw(AuthenticationError(BAD_USER)) if self.exceptions else BAD_USER) # if they dont, we return BAD_USER
         if from_db[2] != bcrypt.hashpw(password.encode(), from_db[3]): # if they do, we check the password
-            return BAD_PASS # if it isn't correct, we return BAD_PASS
+            return ((_ for _ in []).throw(AuthenticationError(BAD_PASS)) if self.exceptions else BAD_PASS) # if it isn't correct, we return BAD_PASS
         key_gen1 = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, iterations=100000, backend=default_backend(), salt=from_db[5]) # make the first key gen object
         key = key_gen1.derive(password.encode()) # next we generate the key the user needs to access their data encryption key
         dek  = keywrap.aes_key_unwrap(key, from_db[4], default_backend())
@@ -84,14 +85,14 @@ class Authenticator:
     def get_key(self, uuid: uuid.UUID, token: str, hwid: str):
         from_store = self.store.get(uuid) # grab the user from the store
         if not from_store: # check if the token exists
-            return BAD_USER # if it doesn't, we return BAD_USER
+            return ((_ for _ in []).throw(AuthenticationError(BAD_USER)) if self.exceptions else BAD_USER) # if it doesn't, we return BAD_USER
         session = self.find_token(from_store, hashlib.sha512(token.encode()).digest()) # search for valid session
         if not session: # check if we found a valid session
-            return BAD_TOKEN # if not, we return BAD_TOKEN
+            return ((_ for _ in []).throw(AuthenticationError(BAD_TOKEN)) if self.exceptions else BAD_TOKEN) # if not, we return BAD_TOKEN
         if session[1] <= datetime.now(pytz.utc): # check if token is expired
-            return BAD_TOKEN # if it is, we return BAD_TOKEN
+            return ((_ for _ in []).throw(AuthenticationError(BAD_TOKEN)) if self.exceptions else BAD_TOKEN) # if it is, we return BAD_TOKEN
         if hwid != session[2]: # check if the hwid is correct
-            return BAD_HWID # if the hwid doesn't match, we return BAD_HWID
+            return ((_ for _ in []).throw(AuthenticationError(BAD_HWID)) if self.exceptions else BAD_HWID) # if the hwid doesn't match, we return BAD_HWID
         session[1] = datetime.now(pytz.utc) + timedelta(seconds=self.max_age) # update the expiry time for the token
         key_generator = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, iterations=100000, backend=default_backend(), salt=hwid.encode()) # make key gen object
         decryption_key = base64.urlsafe_b64encode(key_generator.derive(token.encode())) # generate the key
@@ -101,14 +102,14 @@ class Authenticator:
     def logout(self, uuid: uuid.UUID, token:str, hwid: str):
         from_store = self.store.get(uuid) # grab the user from the store
         if not from_store: # check if the token exists
-            return BAD_USER # if it doesn't, we return BAD_USER
+            return ((_ for _ in []).throw(AuthenticationError(BAD_USER)) if self.exceptions else BAD_USER) # if it doesn't, we return BAD_USER
         session = self.find_token(from_store, hashlib.sha512(token.encode()).digest()) # search for valid session
         if not session: # check if we found a valid session
-            return BAD_TOKEN # if not, we return BAD_TOKEN
+            return ((_ for _ in []).throw(AuthenticationError(BAD_TOKEN)) if self.exceptions else BAD_TOKEN) # if not, we return BAD_TOKEN
         if session[1] <= datetime.now(pytz.utc): # check if token is expired
-            return BAD_TOKEN # if it is, we return BAD_TOKEN
+            return ((_ for _ in []).throw(AuthenticationError(BAD_TOKEN)) if self.exceptions else BAD_TOKEN) # if it is, we return BAD_TOKEN
         if hwid != session[2]: # check if the hwid is correct
-            return BAD_HWID # if the hwid doesn't match, we return BAD_HWID
+            return ((_ for _ in []).throw(AuthenticationError(BAD_HWID)) if self.exceptions else BAD_HWID) # if the hwid doesn't match, we return BAD_HWID
         from_store.remove(session)  # remove the found session from the user's list of sessions
         if not from_store: # check if the user has no more sessions
             del self.store[uuid] # remove them from the store if they dont
@@ -118,11 +119,11 @@ class Authenticator:
     def update_username(self, uuid: uuid.UUID, password: str, new_username: str):
         from_db = self.db.find(self.table, 'uuid', uuid) # first we grab the db entry for the uuid
         if not from_db: # then we check if the user exists
-            return BAD_USER # if they dont, we return BAD_USER
+            return ((_ for _ in []).throw(AuthenticationError(BAD_USER)) if self.exceptions else BAD_USER) # if they dont, we return BAD_USER
         if from_db[2] != bcrypt.hashpw(password.encode('utf-8'), from_db[3]): # if they do, we check the password
-            return BAD_PASS # if the password is incorrect, we return BAD_PASS
+            return ((_ for _ in []).throw(AuthenticationError(BAD_PASS)) if self.exceptions else BAD_PASS) # if the password is incorrect, we return BAD_PASS
         if self.db.find(self.table, 'username', new_username): # check if the new username already exists
-            return BAD_USER # if it does, we return BAD_USER
+            return ((_ for _ in []).throw(AuthenticationError(BAD_USER)) if self.exceptions else BAD_USER) # if it does, we return BAD_USER
         self.db.update(self.table, 'uuid', uuid, username=new_username) # update the username in the database
         return SUCCESS  # and we return SUCCESS
     
@@ -130,12 +131,12 @@ class Authenticator:
     def update_password(self, uuid: uuid.UUID, old_password: str, new_password: str):
         from_db = self.db.find(self.table, 'uuid', uuid) # first we grab the db entry for the uuid
         if not from_db: # then we check if the user exists
-            return BAD_USER # if they dont, we return BAD_USER
+            return ((_ for _ in []).throw(AuthenticationError(BAD_USER)) if self.exceptions else BAD_USER) # if they dont, we return BAD_USER
         from_store = self.store.get(uuid) # grab the user from the store
         if not from_store: # check if the token exists
-            return BAD_USER # if it doesn't, we return BAD_USER
+            return ((_ for _ in []).throw(AuthenticationError(BAD_USER)) if self.exceptions else BAD_USER) # if it doesn't, we return BAD_USER
         if from_db[2] != bcrypt.hashpw(old_password.encode('utf-8'), from_db[3]): # if they do, we check the password
-            return BAD_PASS # if the password is incorrect, we return BAD_PASS
+            return ((_ for _ in []).throw(AuthenticationError(BAD_PASS)) if self.exceptions else BAD_PASS) # if the password is incorrect, we return BAD_PASS
         key_func = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, iterations=100000, backend=default_backend(), salt=from_db[5]) # key func to derive keys from
         new_key = key_func.derive(new_password.encode()) # next we generate the old key for the user
         key_func = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, iterations=100000, backend=default_backend(), salt=from_db[5]) # key func to derive keys from
@@ -150,9 +151,9 @@ class Authenticator:
     def remove_user(self, uuid: uuid.UUID, password:str):
         from_db = self.db.find(self.table, 'uuid', uuid) # first we grab the db entry for the uuid
         if not from_db: # then we check if the user exists
-            return BAD_USER # if they dont, we return BAD_USER
+            return ((_ for _ in []).throw(AuthenticationError(BAD_USER)) if self.exceptions else BAD_USER) # if they dont, we return BAD_USER
         if from_db[2] != bcrypt.hashpw(password.encode('utf-8'), from_db[3]): # if they do, we check the password
-            return BAD_PASS # if the password is incorrect, we return BAD_PASS
+            return ((_ for _ in []).throw(AuthenticationError(BAD_PASS)) if self.exceptions else BAD_PASS) # if the password is incorrect, we return BAD_PASS
         self.db.delete(self.table, 'uuid', uuid) # remove the user from the database
         self.store.pop(uuid, None) # then we try to remove the store entries for the user
         return SUCCESS # and we return SUCCESS

@@ -14,6 +14,9 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.exc import SQLAlchemyError
 hwid = machineid.hashed_id()
+configuration = sixauth.Configure().database(path = os.path.join(os.getcwd(),'test.db'))
+database = sixauth.auth.Database(configuration)
+configuration.authenticator(db = database, exceptions = False)
 def clear_db(engine):
     Base = automap_base()
     Base.prepare(engine)
@@ -31,13 +34,13 @@ def clear_db(engine):
 
 class testAuth(unittest.TestCase):
     def test_111_new_user(self):
-        test = sixauth.main.Authenticator()
+        test = sixauth.Authenticator(configuration)
         clear_db(test.db.engine)
         self.assertEqual(test.new_user('max','password'), sixauth.SUCCESS)
         self.assertEqual(test.new_user('max','password'), sixauth.BAD_USER)
         
     def test_112_login(self):
-        test = sixauth.main.Authenticator()
+        test = sixauth.Authenticator(configuration)
         clear_db(test.db.engine)
         self.assertEqual(test.login('max','password',hwid), sixauth.BAD_USER)
         test.new_user('max','password')
@@ -45,7 +48,7 @@ class testAuth(unittest.TestCase):
         self.assertNotIn(test.login('max','password',hwid), sixauth.ALL)
         
     def test_113_get_key(self):
-        test = sixauth.main.Authenticator()
+        test = sixauth.Authenticator(configuration)
         clear_db(test.db.engine)
         self.assertEqual(test.get_key('bad_uuid','bad_token',hwid), sixauth.BAD_USER)
         test.new_user('max','password')

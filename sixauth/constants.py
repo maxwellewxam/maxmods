@@ -8,6 +8,8 @@ EXISTS = 'EXISTS'
 
 ALL = (BAD_HWID, BAD_USER, BAD_TOKEN, BAD_PASS, NOT_FOUND, EXISTS, SUCCESS)
 
+class AuthenticationError(Exception): ...
+
 class User:
     BAD_USER = True
     TOKEN = None
